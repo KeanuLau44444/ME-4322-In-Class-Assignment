@@ -384,3 +384,131 @@ aF_G = cross(alphaFG_vector,F-G) + cross(angVEL_FG,cross(angVEL_FG,F-G));
 a_S5_F = cross(alphaFG_vector,S5-F) + cross(angVEL_FG,cross(angVEL_FG,S5-F));
 
 aS5_G = a_S5_F + aF_G
+
+
+%% Newton's Second Law / Dynamic Force Analysis
+
+% Mass of Each Link
+
+MassAB = 1;
+MassBEC = 1;
+MassCD = 1;
+MassEF = 1;
+MassFG = 1;
+
+% Mass Moment of Inertia of Each Link
+
+J_AB = 1;
+J_BEC = 1;
+J_CD = 1;
+J_EF = 1;
+J_FG = 1;
+
+% Define Unknown Dynamic Forces and Input Torque
+
+syms NFAx NFAy NFBx NFBy NFCx NFCy NFDx NFDy ...
+     NFEx NFEy NFFx NFFy NFGx NFGy NTin
+
+NForceA = [NFAx NFAy 0];
+NForceB = [NFBx NFBy 0];
+NForceC = [NFCx NFCy 0];
+NForceD = [NFDx NFDy 0];
+NForceE = [NFEx NFEy 0];
+NForceF = [NFFx NFFy 0];
+NForceG = [NFGx NFGy 0];
+
+NInputTorque = [0 0 NTin];
+
+
+%% Newton's Second Law Equations
+
+% Link AB
+% Sum of Forces = Mass * Acceleration of Center of Mass
+
+eqn15 = NForceA + NForceB + WAB == MassAB * aS1_A;
+
+% Sum of Moments about Center of Mass = J * alpha
+
+eqn16 = cross(A-S1,NForceA) + ...
+        cross(B-S1,NForceB) + ...
+        NInputTorque == J_AB * alpha_AB;
+
+
+% Link BEC
+
+eqn17 = -NForceB + NForceC + NForceE + WBEC == ...
+        MassBEC * aS2_A;
+
+eqn18 = cross(B-S2,-NForceB) + ...
+        cross(C-S2,NForceC) + ...
+        cross(E-S2,NForceE) == ...
+        J_BEC * alphaBEC_vector;
+
+
+% Link CD
+
+eqn19 = -NForceC + NForceD + WCD == ...
+        MassCD * aS3_D;
+
+eqn20 = cross(C-S3,-NForceC) + ...
+        cross(D-S3,NForceD) == ...
+        J_CD * alphaCD_vector;
+
+
+% Link EF
+
+eqn21 = -NForceE + NForceF + WEF == ...
+        MassEF * aS4_G;
+
+eqn22 = cross(E-S4,-NForceE) + ...
+        cross(F-S4,NForceF) == ...
+        J_EF * alphaEF_vector;
+
+
+% Link FG
+
+eqn23 = -NForceF + NForceG + WFG + AppliedForce == ...
+        MassFG * aS5_G;
+
+eqn24 = cross(F-S5,-NForceF) + ...
+        cross(G-S5,NForceG) == ...
+        J_FG * alphaFG_vector;
+
+
+%% Collect Equations and Solve
+
+NeqnMatrix = [eqn15, eqn16, ...
+              eqn17, eqn18, ...
+              eqn19, eqn20, ...
+              eqn21, eqn22, ...
+              eqn23, eqn24];
+
+DynamicSolution = solve(NeqnMatrix, ...
+    [NFAx NFAy NFBx NFBy NFCx NFCy NFDx NFDy ...
+     NFEx NFEy NFFx NFFy NFGx NFGy NTin]);
+
+
+%% Convert Solutions to Numeric Values
+
+NForce_Ax = double(DynamicSolution.NFAx)
+NForce_Ay = double(DynamicSolution.NFAy)
+
+NForce_Bx = double(DynamicSolution.NFBx)
+NForce_By = double(DynamicSolution.NFBy)
+
+NForce_Cx = double(DynamicSolution.NFCx)
+NForce_Cy = double(DynamicSolution.NFCy)
+
+NForce_Dx = double(DynamicSolution.NFDx)
+NForce_Dy = double(DynamicSolution.NFDy)
+
+NForce_Ex = double(DynamicSolution.NFEx)
+NForce_Ey = double(DynamicSolution.NFEy)
+
+NForce_Fx = double(DynamicSolution.NFFx)
+NForce_Fy = double(DynamicSolution.NFFy)
+
+NForce_Gx = double(DynamicSolution.NFGx)
+NForce_Gy = double(DynamicSolution.NFGy)
+
+NInput_Torque = double(DynamicSolution.NTin)
