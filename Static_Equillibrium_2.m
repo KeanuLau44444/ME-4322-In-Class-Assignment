@@ -15,6 +15,15 @@ E = [18 35 0];
 F = [43 32 0];
 G = [45 17 0];
 
+% Joint values
+new_B_x(1) = B(1);
+new_B_y(1) = B(1);
+new_E_x(1) = E(1);
+new_E_y(1) = E(1);
+new_F_x(1) = F(1);
+new_F_y(1) = F(1);
+   
+
 % Define the lengths of the bars
 
 lAB = norm(B - A);
@@ -23,6 +32,8 @@ lCD = norm(D - C);
 lDE = norm(E - D);
 lEF = norm(F - E);
 lFG = norm(G - F);
+lCE = norm(E - C);
+lBE = norm(E - B);
 
 % Weight of Each Link
 
@@ -512,3 +523,191 @@ NForce_Gx = double(DynamicSolution.NFGx)
 NForce_Gy = double(DynamicSolution.NFGy)
 
 NInput_Torque = double(DynamicSolution.NTin)
+
+initial_theta = atan2(B(2)-A(2),B(1)-A(1));
+
+if (initial_theta<0)
+    inputAngle = 2*pi + initial_theta;
+else
+
+    inputAngle = initial_theta;
+end
+
+
+for theta=1:1:360
+    % new pos of joint B
+    B_new = A + [lAB*cos(inputAngle+deg2rad(theta)) lAB*sin(inputAngle+deg2rad(theta)) 0]
+    % new pos of joint C
+    [Cx, Cy] = circcirc(B_new(1),B_new(2),lBC,D(1),D(2),lCD);
+
+%% 
+% checking if there is a NaN
+circIntersect_x = any(isnan(vpa(Cx)));
+circIntersect_y = any(isnan(vpa(Cy)));
+
+if circIntersect_x==0 && circIntersect_y==0
+    C_1 = [Cx(1) Cy(1) 0];
+    C_2 = [Cy(2) Cy(2) 0];
+
+    % distance to determine whether C_1 or C_2 is correct
+    dist1 = norm(C_1-C);
+    dist2 = norm(C_2-C);
+
+    if(dist1<dist2)
+        C_new = vpa(C_1);
+    else
+        C_new = vpa(C_2);
+    end
+
+    % New position of Joint E using B_new and C_new
+
+    [Ex,Ey] = circcirc(B_new(1),B_new(2),lBE,C_new(1),C_new(2),lCE);
+
+    % checking if there is a NaN
+    circIntersect_x = any(isnan(vpa(Ex)));
+    circIntersect_y = any(isnan(vpa(Ey)));
+
+    if circIntersect_x==0 && circIntersect_y==0
+        E_1 = [Ex(1) Ey(1) 0];
+        E_2 = [Ex(2) Ey(2) 0];
+
+        % distance to determine whether C_1 or C_2 is correct
+        dist1 = norm(E_1-E);
+        dist2 = norm(E_2-E);
+
+        if(dist1<dist2)
+            E_new = vpa(E_1);
+        else
+            E_new = vpa(E_2);
+        end
+
+    % New position of Joint F using E_new and G_new
+
+    [Fx,Fy] = circcirc(E_new(1),E_new(2),lEF,G(1),G(2),lFG);
+
+    % checking if there is a NaN
+    circIntersect_x = any(isnan(vpa(Fx)));
+    circIntersect_y = any(isnan(vpa(Fy)));
+
+    if circIntersect_x==0 && circIntersect_y==0
+        F_1 = [Fx(1) Fy(1) 0];
+        F_2 = [Fx(2) Fy(2) 0];
+
+        % distance to determine whether C_1 or C_2 is correct
+        dist1 = norm(F_1-F);
+        dist2 = norm(F_2-F);
+
+        if(dist1<dist2)
+            F_new = vpa(F_1);
+        else
+            F_new = vpa(F_2);
+        end
+
+        %Store value for plotting
+
+        new_B_x(theta+1) = B_new(1);
+        new_B_y(theta+1) = B_new(2);
+        new_C_x(theta+1) = C_new(1);
+        new_C_y(theta+1) = C_new(2);
+        new_E_x(theta+1) = E_new(1);
+        new_E_y(theta+1) = E_new(2);
+        new_F_x(theta+1) = F_new(1);
+        new_F_y(theta+1) = F_new(2);
+
+        B=B_new;
+        C=C_new;
+        E=E_new;
+        F=F_new;
+
+        %Static Equilibrium Code
+
+        eqn1 = ForceA + ForceB + WAB == 0;
+
+        eqn2 = cross(A-S1,ForceA) + cross(B-S1,ForceB) + InputTorque == 0;
+
+        eqn3 = -ForceB + ForceC + ForceE + WBEC == 0;
+
+        eqn4 = cross(B-S2,-ForceB) + cross(C-S2,ForceC) + cross(E-S2,ForceE) == 0;
+
+        eqn5 = -ForceC + ForceD + WCD == 0;
+
+        eqn6 = cross(C-S3,-ForceC) + cross(D-S3,ForceD) == 0;
+
+        eqn7 = -ForceE + ForceF + WEF == 0;
+
+        eqn8 = cross(E-S4,-ForceE) + cross(F-S4,ForceF) == 0;
+
+        eqn9 = -ForceF + ForceG + WFG + AppliedForce == 0;
+
+        eqn10 = cross(F-S5,-ForceF) + cross(G-S5,ForceG) == 0;
+
+        eqnMatrix = [eqn1, eqn2, eqn3, eqn4, eqn5, eqn6, eqn7, eqn8, eqn9, eqn10];
+
+        StaticSolution = solve(eqnMatrix, [FAx FAy FBx FBy FCx FCy FDx FDy FEx FEy FFx FFy FGx FGy Tin]);
+
+        Force_Ax(theta+1) = double(StaticSolution.FAx);
+        Force_Ay(theta+1) = double(StaticSolution.FAy);
+
+        Force_Bx(theta+1) = double(StaticSolution.FBx);
+        Force_By(theta+1) = double(StaticSolution.FBy);
+
+        Force_Cx(theta+1) = double(StaticSolution.FCx);
+        Force_Cy(theta+1) = double(StaticSolution.FCy);
+
+        Force_Dx(theta+1) = double(StaticSolution.FDx);
+        Force_Dy(theta+1) = double(StaticSolution.FDy);
+
+        Force_Ex(theta+1) = double(StaticSolution.FEx);
+        Force_Ey(theta+1) = double(StaticSolution.FEy);
+
+        Force_Fx(theta+1) = double(StaticSolution.FFx);
+        Force_Fy(theta+1) = double(StaticSolution.FFy);
+
+        Force_Gx(theta+1) = double(StaticSolution.FGx);
+        Force_Gy(theta+1) = double(StaticSolution.FGy);
+
+        Input_Torque = double(StaticSolution.Tin);
+
+        %Velocity and Acc Equation
+
+        %Newton's Second Law
+
+
+    else
+
+        max_theta = theta - 1;
+
+        fprintf('\nF cannot be determined at theta = %d degrees\n',theta);
+        fprintf('Maximum valid input rotation = %d degrees\n',max_theta);
+
+        break
+    end
+
+
+else
+
+    max_theta = theta - 1;
+
+    fprintf('\nE cannot be determined at theta = %d degrees\n',theta);
+    fprintf('Maximum valid input rotation = %d degrees\n',max_theta);
+
+    break
+end
+
+
+else
+
+    max_theta = theta - 1;
+
+    fprintf('\nC cannot be determined at theta = %d degrees\n',theta);
+    fprintf('Maximum valid input rotation = %d degrees\n',max_theta);
+
+    break
+end
+
+
+end
+
+
+
+
